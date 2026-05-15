@@ -1,0 +1,7 @@
+(library
+ (name procfs_test)
+ (public_name procfs.test)
+ (libraries async core core_unix expect_test_helpers_async file_path
+   filesystem.core core_kernel.iobuf num procfs)
+ (preprocess
+  (pps ppx_jane)))

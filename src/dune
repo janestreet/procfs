@@ -1,0 +1,7 @@
+(library
+ (name procfs)
+ (public_name procfs)
+ (preprocess
+  (pps ppx_jane -require-template-extension))
+ (libraries core core_unix file_path core_kernel.flags netlib.mac_address
+   mmap num core_unix.signal_unix core_unix.sys_unix))

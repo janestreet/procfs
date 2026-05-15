@@ -1,0 +1,6 @@
+(executables
+ (modes byte exe)
+ (names procfs_test)
+ (libraries core_unix.command_unix core core_unix procfs)
+ (preprocess
+  (pps ppx_jane)))
