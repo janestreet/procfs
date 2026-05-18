@@ -471,7 +471,7 @@ module type S = sig
       (** See /usr/include/net/route.h and net/ipv4/fib_trie.c in the kernel. Comments
           here are copied from one of those sources. *)
       module Flags : sig
-        type t
+        type t : immutable_data
 
         include Flags.S with type t := t
 
@@ -713,7 +713,7 @@ module type S = sig
       end
 
       module Flags : sig
-        type t [@@deriving sexp_of]
+        type t : immutable_data [@@deriving sexp_of]
 
         include Flags.S with type t := t
 
@@ -771,7 +771,7 @@ module type S = sig
          # define MAF_TIMER_RUNNING 0x01 ...
       *)
 
-      type t [@@deriving sexp_of]
+      type t : immutable_data [@@deriving sexp_of]
 
       include Flags.S with type t := t
 
