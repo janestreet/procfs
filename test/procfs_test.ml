@@ -7,3 +7,4 @@ module Test_proc_net_tcp = Test_proc_net_tcp
 module Test_proc_net_udp = Test_proc_net_udp
 module Test_process_maps = Test_process_maps
 module Test_process_tasks = Test_process_tasks
+module Test_reused_buffer = Test_reused_buffer
