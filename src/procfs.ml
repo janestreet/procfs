@@ -2753,6 +2753,7 @@ let input_all_with_reused_buffer () =
   let buf = Bytes.create buf_size in
   let buffer = Buffer.create buf_size in
   let read_all fd =
+    Buffer.clear buffer;
     let rec loop () =
       let len = Unix.read fd ~buf ~len:(Bytes.length buf) in
       if len > 0
@@ -2760,10 +2761,11 @@ let input_all_with_reused_buffer () =
         Buffer.add_subbytes buffer buf ~pos:0 ~len;
         loop ())
     in
-    loop ();
-    let res = Buffer.contents buffer in
-    Buffer.clear buffer;
-    res
+    protect
+      ~f:(fun () ->
+        loop ();
+        Buffer.contents buffer)
+      ~finally:(fun () -> Buffer.clear buffer)
   in
   let input_all fn = Unix.with_file fn ~mode:[ Unix.O_RDONLY ] ~f:read_all in
   stage input_all
