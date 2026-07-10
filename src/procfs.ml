@@ -2068,7 +2068,7 @@ module Make (IO : Procfs_intf.IO) = struct
         | [] -> []
         | hd :: tl ->
           let { idx; device; count; querier } = of_header hd in
-          let memberships, tl = List.split_n tl count in
+          let #(memberships, tl) = List.split_n tl count in
           List.map memberships ~f:(of_line ~idx ~device ~querier) @ of_lines tl
       ;;
 

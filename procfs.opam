@@ -26,6 +26,9 @@ depends: [
   "num"
 ]
 available: arch != "x86_32"
+conflicts: [
+  "oxcaml-compiler" {< "5.2.0minus39"}
+]
 synopsis: "A parser for values in the Linux `/proc` filesystem."
 description: "
 A parser for values in the Linux `/proc` filesystem.
