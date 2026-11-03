@@ -3,4 +3,4 @@
  (names procfs_test)
  (libraries core_unix.command_unix core core_unix procfs)
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_jane -compare-require-explicit-locality)))

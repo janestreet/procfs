@@ -146,7 +146,7 @@ module type S = sig
           | Tracing_stop (* Linux 2.6.33 onward. *)
           | Dead (* An internal state we do not expect to see. *)
           | Unknown of char
-        [@@deriving equal ~localize, sexp_of]
+        [@@deriving equal, sexp_of]
       end
 
       type t =
@@ -278,6 +278,7 @@ module type S = sig
         }
       [@@deriving fields ~getters, sexp_of] [@@fields.no_zero_alloc]
 
+      val load : Pid.t -> t Or_error.t io
       val of_string : string -> t
     end
 
@@ -372,6 +373,7 @@ module type S = sig
       ; mem_free : bigint
       ; buffers : bigint
       ; cached : bigint
+      ; shmem : bigint
       ; swap_cached : bigint
       ; active : bigint
       ; inactive : bigint
@@ -568,7 +570,7 @@ module type S = sig
         | UDPLITE
         | RAW
         | Unknown of int
-      [@@deriving sexp_of, compare ~localize, equal ~localize, hash]
+      [@@deriving sexp_of, compare, equal, hash]
 
       val to_int : t -> int
       val of_int : int -> t
@@ -594,7 +596,7 @@ module type S = sig
         | TCP_LISTEN
         | TCP_CLOSING
         | Unknown of int
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
 
       val to_int : t -> int
       val of_int : int -> t
@@ -615,7 +617,7 @@ module type S = sig
         | Default_destination_assigned
         | No_default_destination_assigned
         | Unknown of int
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
 
       val to_int : t -> int
       val of_int : int -> t
@@ -630,7 +632,7 @@ module type S = sig
         | Default_destination_assigned
         | No_default_destination_assigned
         | Unknown of int
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
 
       val to_int : t -> int
       val of_int : int -> t
@@ -641,7 +643,7 @@ module type S = sig
         | Tcp of Tcp_state.t
         | Udp of Udp_state.t
         | Raw of Raw_state.t
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
     end
 
     type 'state t =
@@ -706,7 +708,7 @@ module type S = sig
           | EUI64
           | INFINIBAND
           | Unknown of int
-        [@@deriving sexp_of, equal ~localize]
+        [@@deriving sexp_of, equal]
 
         val to_int : t -> int
         val of_int : int -> t
@@ -855,6 +857,10 @@ module type S = sig
       individual task (thread) info should be loaded into [task_stats]. *)
   type 'a with_process_load_args = ?load_tasks:bool -> 'a
 
+  (** [get_all_pids] returns a snapshot of the process IDs in [/proc]. Processes may exit
+      before the caller uses the result. *)
+  val get_all_pids : unit -> Pid.t list io
+
   (** [get_all_procs] returns a list of all processes on the system. *)
   val get_all_procs : (unit -> Process.t list io) with_process_load_args
 
@@ -984,7 +990,7 @@ module type S = sig
       { major : int
       ; minor : int
       }
-    [@@deriving equal ~localize, sexp_of]
+    [@@deriving equal, sexp_of]
   end
 
   module Lock : sig
@@ -993,13 +999,13 @@ module type S = sig
         { start : int
         ; end_ : [ `At of int | `Eof ]
         }
-      [@@deriving equal ~localize, sexp_of]
+      [@@deriving equal, sexp_of]
 
       type t =
         | Flock of Pid.t option
         | Ofd of file_region (** "Open file description" lock. *)
         | Posix of Pid.t option * file_region
-      [@@deriving equal ~localize, sexp_of]
+      [@@deriving equal, sexp_of]
     end
 
     type t =
@@ -1007,7 +1013,7 @@ module type S = sig
       ; type_ : [ `Read | `Write ] (** Read = Shared; Write = Exclusive. *)
       ; inode : (Device_number.t * Process.Inode.t) option
       }
-    [@@deriving equal ~localize, sexp_of]
+    [@@deriving equal, sexp_of]
   end
 
   val get_locks : unit -> Lock.t list io

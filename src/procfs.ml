@@ -29,7 +29,7 @@ module Stable = struct
           | UDPLITE
           | RAW
           | Unknown of int
-        [@@deriving bin_io, compare ~localize, sexp]
+        [@@deriving bin_io, compare, sexp]
       end
     end
   end
@@ -58,7 +58,7 @@ module Stable = struct
         ; flushes : int64 option
         ; flush_time : int option
         }
-      [@@deriving bin_io, compare ~localize, sexp]
+      [@@deriving bin_io, compare, sexp]
     end
   end
 end
@@ -112,8 +112,7 @@ module Make (IO : Procfs_intf.IO) = struct
       val to_int64 : t -> int64
       val of_int : int -> t
 
-      include%template Comparable.S_plain [@mode local] with type t := t
-
+      include Comparable.S_plain with type t := t
       include Hashable.S_plain with type t := t
     end =
       Int64
@@ -301,7 +300,7 @@ module Make (IO : Procfs_intf.IO) = struct
           | Tracing_stop
           | Dead
           | Unknown of char
-        [@@deriving equal ~localize, sexp_of]
+        [@@deriving equal, sexp_of]
       end
 
       type t =
@@ -567,6 +566,11 @@ module Make (IO : Procfs_intf.IO) = struct
             ; fsgid = h
             })
       ;;
+
+      let load pid =
+        IO.or_error_try_with (fun () ->
+          IO.string_of_file [%string "/proc/%{pid#Pid}/status"] >>| of_string)
+      ;;
     end
 
     module Fd = struct
@@ -691,7 +695,8 @@ module Make (IO : Procfs_intf.IO) = struct
             >>| Option.some
             >>| Or_error.return)
           ~handler:(function
-            | Sys_error _ | Unix.Unix_error ((EACCES | EINVAL | ENOENT), _, _) -> Ok None
+            | Sys_error _ | Unix.Unix_error ((EACCES | EINVAL | ENOENT | ESRCH), _, _) ->
+              Ok None
             | exn -> Or_error.of_exn exn)
       in
       let slurp_file ~path conv = slurp IO.string_of_file ~path conv
@@ -819,6 +824,7 @@ module Make (IO : Procfs_intf.IO) = struct
       ; mem_free : bigint
       ; buffers : bigint
       ; cached : bigint
+      ; shmem : bigint
       ; swap_cached : bigint
       ; active : bigint
       ; inactive : bigint
@@ -876,6 +882,7 @@ module Make (IO : Procfs_intf.IO) = struct
       ; mem_free = get "MemFree"
       ; buffers = get "Buffers"
       ; cached = get "Cached"
+      ; shmem = get "Shmem"
       ; swap_cached = get "SwapCached"
       ; swap_free = get "SwapFree"
       ; active = get "Active"
@@ -1073,7 +1080,7 @@ module Make (IO : Procfs_intf.IO) = struct
         foundation, but leave an easy path towards removing this type if it ever becomes
         foundation. *)
     module Inet_port = struct
-      type t = int [@@deriving sexp_of, equal ~localize]
+      type t = int [@@deriving sexp_of, equal]
 
       let of_int_exn x =
         if x > 0 && x < 65536
@@ -1441,7 +1448,7 @@ module Make (IO : Procfs_intf.IO) = struct
         | UDPLITE
         | RAW
         | Unknown of int
-      [@@deriving sexp_of, variants, compare ~localize, equal ~localize, hash]
+      [@@deriving sexp_of, variants, compare, equal, hash]
 
       let to_int t =
         match t with
@@ -1516,7 +1523,7 @@ module Make (IO : Procfs_intf.IO) = struct
         | TCP_LISTEN
         | TCP_CLOSING
         | Unknown of int
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
 
       let to_int = function
         | TCP_ESTABLISHED -> 1
@@ -1556,7 +1563,7 @@ module Make (IO : Procfs_intf.IO) = struct
         | Default_destination_assigned
         | No_default_destination_assigned
         | Unknown of int
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
 
       let to_int = function
         | Default_destination_assigned -> 1
@@ -1578,7 +1585,7 @@ module Make (IO : Procfs_intf.IO) = struct
         | Default_destination_assigned
         | No_default_destination_assigned
         | Unknown of int
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
 
       let to_int = function
         | Default_destination_assigned -> 1
@@ -1600,7 +1607,7 @@ module Make (IO : Procfs_intf.IO) = struct
         | Tcp of Tcp_state.t
         | Udp of Udp_state.t
         | Raw of Raw_state.t
-      [@@deriving sexp_of, equal ~localize]
+      [@@deriving sexp_of, equal]
     end
 
     type 'state t =
@@ -1620,7 +1627,7 @@ module Make (IO : Procfs_intf.IO) = struct
       ; inode : Process.Inode.t
       ; rest : string
       }
-    [@@deriving sexp_of, fields ~getters, equal ~localize]
+    [@@deriving sexp_of, fields ~getters, equal]
 
     let map_state t ~f = { t with state = f t.state }
 
@@ -1636,7 +1643,7 @@ module Make (IO : Procfs_intf.IO) = struct
     end
 
     module Inet_l4_proto (M : sig
-        type state [@@deriving sexp_of, equal ~localize]
+        type state [@@deriving sexp_of, equal]
 
         val state_of_hex : string -> state
         val file : string
@@ -1644,7 +1651,7 @@ module Make (IO : Procfs_intf.IO) = struct
         val ipproto : Ipproto.t
       end) =
     struct
-      type nonrec t = M.state t [@@deriving sexp_of, equal ~localize]
+      type nonrec t = M.state t [@@deriving sexp_of, equal]
 
       let socket_domain = M.socket_domain
       let ipproto = M.ipproto
@@ -1720,7 +1727,7 @@ module Make (IO : Procfs_intf.IO) = struct
     end
 
     module Tcp = Inet_l4_proto (struct
-        type state = Tcp_state.t [@@deriving sexp_of, equal ~localize]
+        type state = Tcp_state.t [@@deriving sexp_of, equal]
 
         let state_of_hex = Tcp_state.of_hex
         let file = "/proc/net/tcp"
@@ -1795,7 +1802,7 @@ module Make (IO : Procfs_intf.IO) = struct
     ;;
 
     module Udp = Inet_l4_proto (struct
-        type state = Udp_state.t [@@deriving sexp_of, equal ~localize]
+        type state = Udp_state.t [@@deriving sexp_of, equal]
 
         let state_of_hex = Udp_state.of_hex
         let file = "/proc/net/udp"
@@ -1804,7 +1811,7 @@ module Make (IO : Procfs_intf.IO) = struct
       end)
 
     module Raw = Inet_l4_proto (struct
-        type state = Raw_state.t [@@deriving sexp_of, equal ~localize]
+        type state = Raw_state.t [@@deriving sexp_of, equal]
 
         let state_of_hex = Raw_state.of_hex
         let file = "/proc/net/raw"
@@ -1813,7 +1820,7 @@ module Make (IO : Procfs_intf.IO) = struct
       end)
 
     module Tcp6 = Inet_l4_proto (struct
-        type state = Tcp_state.t [@@deriving sexp_of, equal ~localize]
+        type state = Tcp_state.t [@@deriving sexp_of, equal]
 
         let state_of_hex = Tcp_state.of_hex
         let file = "/proc/net/tcp6"
@@ -1822,7 +1829,7 @@ module Make (IO : Procfs_intf.IO) = struct
       end)
 
     module Udp6 = Inet_l4_proto (struct
-        type state = Udp_state.t [@@deriving sexp_of, equal ~localize]
+        type state = Udp_state.t [@@deriving sexp_of, equal]
 
         let state_of_hex = Udp_state.of_hex
         let file = "/proc/net/udp6"
@@ -1831,7 +1838,7 @@ module Make (IO : Procfs_intf.IO) = struct
       end)
 
     module Raw6 = Inet_l4_proto (struct
-        type state = Raw_state.t [@@deriving sexp_of, equal ~localize]
+        type state = Raw_state.t [@@deriving sexp_of, equal]
 
         let state_of_hex = Raw_state.of_hex
         let file = "/proc/net/raw6"
@@ -1858,7 +1865,7 @@ module Make (IO : Procfs_intf.IO) = struct
           | EUI64
           | INFINIBAND
           | Unknown of int
-        [@@deriving sexp_of, equal ~localize]
+        [@@deriving sexp_of, equal]
 
         let to_int = function
           | NETROM -> 0
@@ -2304,17 +2311,20 @@ module Make (IO : Procfs_intf.IO) = struct
 
   type 'a with_process_load_args = ?load_tasks:bool -> 'a
 
-  let get_all_procs ?load_tasks () =
+  let get_all_pids () =
     IO.readdir "/proc"
     >>| Array.to_list
+    >>| List.filter_map ~f:(fun pid -> Option.try_with (fun () -> Pid.of_string pid))
+  ;;
+
+  let get_all_procs ?load_tasks () =
+    get_all_pids ()
     >>= IO.List.filter_map ~f:(fun pid ->
       (* Failures usually aren't a fatal *system* condition. procfs queries on Linux
          simply are not consistent. They're generally thwarted by terminating processes.
          We simply skip the proc entry on failure.
       *)
-      match Option.try_with (fun () -> Pid.of_string pid) with
-      | None -> return None
-      | Some pid -> Process.load ?load_tasks pid >>| Or_error.ok)
+      Process.load ?load_tasks pid >>| Or_error.ok)
   ;;
 
   let get_pid_ancestry_unsafe ?load_tasks pid =
@@ -2607,7 +2617,7 @@ module Make (IO : Procfs_intf.IO) = struct
       { major : int
       ; minor : int
       }
-    [@@deriving equal ~localize, sexp_of]
+    [@@deriving equal, sexp_of]
   end
 
   module Lock = struct
@@ -2616,13 +2626,13 @@ module Make (IO : Procfs_intf.IO) = struct
         { start : int
         ; end_ : [ `At of int | `Eof ]
         }
-      [@@deriving equal ~localize, sexp_of]
+      [@@deriving equal, sexp_of]
 
       type t =
         | Flock of Pid.t option
         | Ofd of file_region
         | Posix of Pid.t option * file_region
-      [@@deriving equal ~localize, sexp_of]
+      [@@deriving equal, sexp_of]
     end
 
     type t =
@@ -2630,7 +2640,7 @@ module Make (IO : Procfs_intf.IO) = struct
       ; type_ : [ `Read | `Write ]
       ; inode : (Device_number.t * Process.Inode.t) option
       }
-    [@@deriving equal ~localize, sexp_of]
+    [@@deriving equal, sexp_of]
   end
 
   (* To follow the parsing logic here, see [locks_show] in fs/locks.c:
