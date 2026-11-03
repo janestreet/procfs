@@ -278,6 +278,7 @@ module type S = sig
         }
       [@@deriving fields ~getters, sexp_of] [@@fields.no_zero_alloc]
 
+      val load : Pid.t -> t Or_error.t io
       val of_string : string -> t
     end
 
@@ -372,6 +373,7 @@ module type S = sig
       ; mem_free : bigint
       ; buffers : bigint
       ; cached : bigint
+      ; shmem : bigint
       ; swap_cached : bigint
       ; active : bigint
       ; inactive : bigint
@@ -854,6 +856,10 @@ module type S = sig
   (** Options when returning process details: [load_tasks] (default [true]) indicates that
       individual task (thread) info should be loaded into [task_stats]. *)
   type 'a with_process_load_args = ?load_tasks:bool -> 'a
+
+  (** [get_all_pids] returns a snapshot of the process IDs in [/proc]. Processes may exit
+      before the caller uses the result. *)
+  val get_all_pids : unit -> Pid.t list io
 
   (** [get_all_procs] returns a list of all processes on the system. *)
   val get_all_procs : (unit -> Process.t list io) with_process_load_args

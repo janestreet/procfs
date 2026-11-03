@@ -567,6 +567,11 @@ module Make (IO : Procfs_intf.IO) = struct
             ; fsgid = h
             })
       ;;
+
+      let load pid =
+        IO.or_error_try_with (fun () ->
+          IO.string_of_file [%string "/proc/%{pid#Pid}/status"] >>| of_string)
+      ;;
     end
 
     module Fd = struct
@@ -691,7 +696,8 @@ module Make (IO : Procfs_intf.IO) = struct
             >>| Option.some
             >>| Or_error.return)
           ~handler:(function
-            | Sys_error _ | Unix.Unix_error ((EACCES | EINVAL | ENOENT), _, _) -> Ok None
+            | Sys_error _ | Unix.Unix_error ((EACCES | EINVAL | ENOENT | ESRCH), _, _) ->
+              Ok None
             | exn -> Or_error.of_exn exn)
       in
       let slurp_file ~path conv = slurp IO.string_of_file ~path conv
@@ -819,6 +825,7 @@ module Make (IO : Procfs_intf.IO) = struct
       ; mem_free : bigint
       ; buffers : bigint
       ; cached : bigint
+      ; shmem : bigint
       ; swap_cached : bigint
       ; active : bigint
       ; inactive : bigint
@@ -876,6 +883,7 @@ module Make (IO : Procfs_intf.IO) = struct
       ; mem_free = get "MemFree"
       ; buffers = get "Buffers"
       ; cached = get "Cached"
+      ; shmem = get "Shmem"
       ; swap_cached = get "SwapCached"
       ; swap_free = get "SwapFree"
       ; active = get "Active"
@@ -1746,7 +1754,7 @@ module Make (IO : Procfs_intf.IO) = struct
     ;;
 
     let%test _ =
-      [%equal: Tcp_state.t t option]
+      [%template [%equal: Tcp_state.t t option] [@mode local]]
         (Tcp.of_line
            "  40: 458719AC:9342 CC1619AC:0016 01 00000000:00000000 02:000296F0 00000000 \
             12021        0      64400541 2 ffff88022c777400 20 3 0 10 -1")
@@ -1771,7 +1779,7 @@ module Make (IO : Procfs_intf.IO) = struct
 
     (* Port 0 on the other side *)
     let%test _ =
-      [%equal: Tcp_state.t t option]
+      [%template [%equal: Tcp_state.t t option] [@mode local]]
         (Tcp.of_line
            "  31: 0100007F:177E 00000000:0000 0A 00000000:00000000 00:00000000 00000000 \
             12021        0 778748 1 ffff8102edd1ad00 3000 0 0 2 -1")
@@ -2304,17 +2312,20 @@ module Make (IO : Procfs_intf.IO) = struct
 
   type 'a with_process_load_args = ?load_tasks:bool -> 'a
 
-  let get_all_procs ?load_tasks () =
+  let get_all_pids () =
     IO.readdir "/proc"
     >>| Array.to_list
+    >>| List.filter_map ~f:(fun pid -> Option.try_with (fun () -> Pid.of_string pid))
+  ;;
+
+  let get_all_procs ?load_tasks () =
+    get_all_pids ()
     >>= IO.List.filter_map ~f:(fun pid ->
       (* Failures usually aren't a fatal *system* condition. procfs queries on Linux
          simply are not consistent. They're generally thwarted by terminating processes.
          We simply skip the proc entry on failure.
       *)
-      match Option.try_with (fun () -> Pid.of_string pid) with
-      | None -> return None
-      | Some pid -> Process.load ?load_tasks pid >>| Or_error.ok)
+      Process.load ?load_tasks pid >>| Or_error.ok)
   ;;
 
   let get_pid_ancestry_unsafe ?load_tasks pid =
@@ -2691,7 +2702,8 @@ module Make (IO : Procfs_intf.IO) = struct
             | "FLOCK" ->
               let pid = Option.try_with (fun () -> Pid.of_string pid) in
               assert (Int.equal region_start 0);
-              assert ([%equal: [ `At of int | `Eof ]] region_end `Eof);
+              assert (
+                [%template [%equal: [ `At of int | `Eof ]] [@mode local]] region_end `Eof);
               Some (Flock pid)
             | "LEASE" | "DELEG" ->
               (* Lease support is not currently implemented. *)
